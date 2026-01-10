@@ -1,6 +1,4 @@
 builds:
   - include:
       - "packages.*.dev-browser"
-      - "packages.*.dev-browser-daemon"
-      - "packages.*.dev-browser-mcp-server"
       - "packages.*.dev-browser-skill"
