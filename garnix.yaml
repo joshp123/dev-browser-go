@@ -1,4 +1,3 @@
 builds:
   - include:
       - "packages.*.dev-browser-go"
-      - "packages.*.dev-browser-skill"

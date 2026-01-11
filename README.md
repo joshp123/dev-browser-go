@@ -28,7 +28,7 @@ Inspired by [SawyerHood/dev-browser](https://github.com/SawyerHood/dev-browser).
 
 ## Install
 
-Requires Playwright browsers. Use Nix dev shell (includes Playwright drivers/browsers) or allow Playwright-Go to download on first run.
+Playwright browsers are required. The Nix package wraps `PLAYWRIGHT_BROWSERS_PATH` to the packaged Chromium; dev shell includes the driver/browsers. Outside Nix, Playwright-Go will download on first run.
 
 ### Nix (flake)
 

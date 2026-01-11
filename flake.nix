@@ -19,6 +19,11 @@
           subPackages = [ "cmd/dev-browser-go" ];
           vendorHash = "sha256-pggjWBdRjfZ5Qs/i3bubhyRAvXFqYg2BAiQ3j7ov9tU=";
           ldflags = [ "-s" "-w" ];
+          nativeBuildInputs = [ pkgs.makeWrapper ];
+          postInstall = ''
+            wrapProgram $out/bin/dev-browser-go \
+              --set PLAYWRIGHT_BROWSERS_PATH ${pkgs.playwright-driver.browsers}
+          '';
           meta = with pkgs.lib; {
             description = "Ref-based browser automation CLI+daemon (Go, Playwright)";
             homepage = "https://github.com/joshp123/dev-browser-go";
@@ -27,15 +32,9 @@
             mainProgram = "dev-browser-go";
           };
         };
-
-        devBrowserSkill = pkgs.runCommand "dev-browser-skill" {} ''
-          mkdir -p "$out/dev-browser"
-          ln -s ${self}/SKILL.md "$out/dev-browser/SKILL.md"
-        '';
       in {
         packages = {
           dev-browser-go = devBrowserGo;
-          dev-browser-skill = devBrowserSkill;
           default = devBrowserGo;
         };
 
