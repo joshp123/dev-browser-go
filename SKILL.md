@@ -25,6 +25,8 @@ dev-browser-go snapshot
 dev-browser-go click-ref e3
 ```
 
+Run `dev-browser-go --help` for full CLI reference.
+
 ## Core Workflow
 
 1. **Navigate** to a URL
@@ -61,16 +63,17 @@ dev-browser-go snapshot
 dev-browser-go goto <url>                    # Navigate to URL
 dev-browser-go goto <url> --page checkout    # Use named page
 dev-browser-go list-pages                    # List open pages
+dev-browser-go close-page <name>             # Close named page
 ```
 
 ### Inspection
 ```bash
 dev-browser-go snapshot                      # Get refs for interactive elements
-dev-browser-go snapshot --no-interactive-only  # Include all elements
+dev-browser-go snapshot --interactive-only=false  # Include all elements
 dev-browser-go snapshot --engine aria        # Use ARIA engine (better for complex UIs)
-DEV_BROWSER_WINDOW_SIZE=7680x2160 dev-browser-go screenshot   # Full-page at ultrawide viewport (will be downscaled by models)
+dev-browser-go screenshot                    # Full-page screenshot
 dev-browser-go screenshot --annotate-refs    # Overlay ref labels on screenshot
-dev-browser-go screenshot --crop 0,0,2000,2000 # Crop region (hard clamp 2000x2000; models degrade badly above this)
+dev-browser-go screenshot --crop 0,0,800,600 # Crop region (max 2000x2000)
 dev-browser-go save-html                     # Save page HTML
 ```
 
@@ -81,6 +84,19 @@ dev-browser-go fill-ref <ref> "text"         # Fill input by ref
 dev-browser-go press Enter                   # Press key
 dev-browser-go press Tab                     # Navigate with Tab
 dev-browser-go press Escape                  # Close modals
+```
+
+### Waiting
+```bash
+dev-browser-go wait                          # Wait for page load
+dev-browser-go wait --state networkidle      # Wait for network idle
+dev-browser-go wait --timeout-ms 5000        # Custom timeout
+```
+
+### Batch Actions
+```bash
+# Execute multiple actions in one call
+echo '[{"tool":"click_ref","args":{"ref":"e1"}},{"tool":"press","args":{"key":"Enter"}}]' | dev-browser-go actions
 ```
 
 ### Daemon Management
@@ -121,29 +137,29 @@ dev-browser-go snapshot --page settings  # Back to settings
 ### Headless Mode
 For CI or background tasks:
 ```bash
+HEADLESS=1 dev-browser-go goto https://example.com
+```
+
+Or start explicitly:
+```bash
 dev-browser-go stop
 dev-browser-go start --headless
-dev-browser-go goto https://example.com
+```
+
+### Viewport Size
+Default is 2500x1920. Override with env:
+```bash
+DEV_BROWSER_WINDOW_SIZE=1920x1080 dev-browser-go goto https://example.com
 ```
 
 ### Debugging
 If something isn't working:
 ```bash
-dev-browser-go screenshot  # See current state
-dev-browser-go snapshot --no-interactive-only  # See all elements
-# Force viewport size (default 2500x1920, env overrides)
-DEV_BROWSER_WINDOW_SIZE=7680x2160 dev-browser-go snapshot
+dev-browser-go screenshot                    # See current state
+dev-browser-go snapshot --interactive-only=false  # See all elements
 ```
 
-## Comparison with SawyerHood/dev-browser-go
+## See Also
 
-This is a Python/CLI rewrite of [SawyerHood/dev-browser-go](https://github.com/SawyerHood/dev-browser-go). Same ref-based model, different interface:
-
-| This (CLI) | Sawyer's (Skill) |
-|------------|------------------|
-| Shell commands | TypeScript scripts |
-| `dev-browser-go` CLI | `npx tsx` heredocs |
-| Python + Playwright | Node + Playwright |
-| Simpler, lower context | More features (extension mode) |
-
-Consider Sawyer's original if you want Chrome extension mode (control existing logged-in browser).
+- `dev-browser-go --help` for full CLI reference
+- [README.md](README.md) for installation and architecture

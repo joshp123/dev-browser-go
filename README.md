@@ -13,7 +13,7 @@ Inspired by [SawyerHood/dev-browser](https://github.com/SawyerHood/dev-browser).
 | Feature | SawyerHood/dev-browser | dev-browser-go |
 |---------|------------------------|----------------|
 | Language | TypeScript | Go |
-| Runtime | Bun + browser extension | Playwright (Go) |
+| Runtime | Bun + browser extension | Playwright-Go |
 | Interface | Browser extension skill | CLI + daemon |
 | Install | `.plugin` | Go binary / Nix |
 | Best for | Desktop skill users | CLI/LLM agents, Nix users |
@@ -42,27 +42,68 @@ nix profile install github:joshp123/dev-browser-go#dev-browser-go
 ```bash
 go build ./cmd/dev-browser-go
 ./dev-browser-go goto https://example.com
-./dev-browser-go snapshot --engine aria --format list
+./dev-browser-go snapshot
 ```
-
-Env knobs (kept minimal): `DEV_BROWSER_PROFILE`, `HEADLESS`, `DEV_BROWSER_WINDOW_SIZE`, `DEV_BROWSER_ALLOW_UNSAFE_PATHS` (for artifacts). Daemon is the same binary invoked with `--daemon` internally; `HEADLESS=1` recommended for CI/agents.
 
 ## CLI Usage
 
 ```bash
+dev-browser-go --help              # Full usage
+dev-browser-go --version           # Version
+
 dev-browser-go goto https://example.com
-dev-browser-go snapshot                    # get refs
-dev-browser-go click-ref e3                # click ref e3
-dev-browser-go fill-ref e5 "search query"  # fill input
-dev-browser-go screenshot
-dev-browser-go press Enter
+dev-browser-go snapshot            # Get refs (e1, e2, ...)
+dev-browser-go click-ref e3        # Click ref
+dev-browser-go fill-ref e5 "text"  # Fill input
+dev-browser-go screenshot          # Capture
+dev-browser-go press Enter         # Keyboard
 ```
 
-The daemon starts automatically on first command and keeps the browser session alive. Screenshot crops clamp to 2000x2000; models downscale larger captures and quality will be poor.
+The daemon starts automatically on first command and keeps the browser session alive.
+
+### Global Flags
+
+```
+--profile <name>    Browser profile (default: "default", env DEV_BROWSER_PROFILE)
+--headless          Force headless mode (env HEADLESS=1)
+--output <format>   Output format: summary|json|path (default: summary)
+--out <path>        Write output to file (with --output=path)
+```
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DEV_BROWSER_PROFILE` | Browser profile name |
+| `HEADLESS` | Run headless (1/true/yes) |
+| `DEV_BROWSER_WINDOW_SIZE` | Viewport WxH (default 2500x1920) |
+| `DEV_BROWSER_ALLOW_UNSAFE_PATHS` | Allow artifact writes outside cache dir |
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `goto <url>` | Navigate to URL |
+| `snapshot` | Accessibility tree with refs |
+| `click-ref <ref>` | Click element by ref |
+| `fill-ref <ref> "text"` | Fill input by ref |
+| `press <key>` | Keyboard input |
+| `screenshot` | Save screenshot (crops clamp to 2000x2000) |
+| `save-html` | Save page HTML |
+| `wait` | Wait for page state |
+| `list-pages` | Show open pages |
+| `close-page <name>` | Close named page |
+| `call <tool>` | Generic tool call with JSON args |
+| `actions` | Batch tool calls from JSON |
+| `status` | Daemon status |
+| `start` | Start daemon |
+| `stop` | Stop daemon |
+
+Run `dev-browser-go <command> --help` for command-specific options.
 
 ## Integration with AI Agents
 
-Add to your project's agent docs:
+Add to your project's agent docs (or use [SKILL.md](SKILL.md) directly):
 
 ```markdown
 ## Browser Automation
@@ -74,45 +115,9 @@ Workflow:
 2. `dev-browser-go snapshot` - get interactive elements as refs (e1, e2, etc.)
 3. `dev-browser-go click-ref <ref>` or `dev-browser-go fill-ref <ref> "text"` - interact
 4. `dev-browser-go screenshot` - capture state if needed
-
-Example:
-```bash
-dev-browser-go goto https://github.com/login
-dev-browser-go snapshot
-# Output: e1: textbox "Username" | e2: textbox "Password" | e3: button "Sign in"
-dev-browser-go fill-ref e1 "myuser"
-dev-browser-go fill-ref e2 "mypass"
-dev-browser-go click-ref e3
-```
 ```
 
-## Integration with shell-driven agents
-
-Any agent with shell access can call the CLI. Example prompt:
-
-```
-Use dev-browser-go to navigate to example.com and find all links on the page.
-
-Available commands:
-- dev-browser-go goto <url>
-- dev-browser-go snapshot [--interactive-only / --no-interactive-only]
-- dev-browser-go click-ref <ref>
-- dev-browser-go fill-ref <ref> "text"
-- dev-browser-go screenshot
-- dev-browser-go press <key>
-```
-
-## Tools
-
-- `goto <url>` - navigate
-- `snapshot` - accessibility tree with refs
-- `click-ref <ref>` - click element
-- `fill-ref <ref> "text"` - fill input
-- `press <key>` - keyboard input
-- `screenshot` - save screenshot
-- `save-html` - save page HTML
-- `list-pages` - show open pages
-- `status` / `start` / `stop` - daemon management
+For detailed workflow examples, see [SKILL.md](SKILL.md).
 
 ## Versioning & Releases
 

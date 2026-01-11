@@ -16,6 +16,8 @@ import (
 	devbrowser "github.com/joshp123/dev-browser-go/internal/devbrowser"
 )
 
+const version = "0.1.0"
+
 type globals struct {
 	profile  string
 	headless bool
@@ -31,7 +33,25 @@ func main() {
 }
 
 func run(args []string) error {
-	if len(args) > 0 && args[0] == "--daemon" {
+	if len(args) == 0 {
+		printUsage()
+		return nil
+	}
+
+	if args[0] == "--help" || args[0] == "-h" {
+		printUsage()
+		return nil
+	}
+	if args[0] == "--version" || args[0] == "-v" {
+		fmt.Println(version)
+		return nil
+	}
+
+	if args[0] == "--daemon" {
+		if len(args) > 1 && (args[1] == "--help" || args[1] == "-h") {
+			printDaemonUsage()
+			return nil
+		}
 		return runDaemon(args[1:])
 	}
 
@@ -40,11 +60,20 @@ func run(args []string) error {
 		return err
 	}
 	if len(rest) == 0 {
-		return errors.New("command required")
+		printUsage()
+		return nil
 	}
 
 	cmd := rest[0]
 	rest = rest[1:]
+
+	if len(rest) > 0 {
+		if rest[0] == "--help" || rest[0] == "-h" {
+			printCommandUsage(cmd)
+			return nil
+		}
+	}
+
 	switch cmd {
 	case "status":
 		if devbrowser.IsDaemonHealthy(g.profile) {
@@ -94,10 +123,13 @@ func run(args []string) error {
 
 	case "call":
 		fs := flag.NewFlagSet("call", flag.ContinueOnError)
-		argsJSON := fs.String("args", "{}", "")
-		page := fs.String("page", "main", "")
-		fs.SetOutput(io.Discard)
+		argsJSON := fs.String("args", "{}", "JSON args for tool")
+		page := fs.String("page", "main", "Page name")
+		fs.Usage = func() { printCommandUsage("call") }
 		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		if fs.NArg() < 1 {
@@ -112,11 +144,14 @@ func run(args []string) error {
 
 	case "goto":
 		fs := flag.NewFlagSet("goto", flag.ContinueOnError)
-		pageName := fs.String("page", "main", "")
-		waitUntil := fs.String("wait-until", "domcontentloaded", "")
-		timeout := fs.Int("timeout-ms", 45_000, "")
-		fs.SetOutput(io.Discard)
+		pageName := fs.String("page", "main", "Page name")
+		waitUntil := fs.String("wait-until", "domcontentloaded", "Wait strategy")
+		timeout := fs.Int("timeout-ms", 45_000, "Timeout ms")
+		fs.Usage = func() { printCommandUsage("goto") }
 		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		if fs.NArg() < 1 {
@@ -127,15 +162,18 @@ func run(args []string) error {
 
 	case "snapshot":
 		fs := flag.NewFlagSet("snapshot", flag.ContinueOnError)
-		pageName := fs.String("page", "main", "")
-		engine := fs.String("engine", "simple", "")
-		format := fs.String("format", "list", "")
-		interactiveOnly := fs.Bool("interactive-only", true, "")
-		includeHeadings := fs.Bool("include-headings", true, "")
-		maxItems := fs.Int("max-items", 80, "")
-		maxChars := fs.Int("max-chars", 8000, "")
-		fs.SetOutput(io.Discard)
+		pageName := fs.String("page", "main", "Page name")
+		engine := fs.String("engine", "simple", "Engine (simple|aria)")
+		format := fs.String("format", "list", "Format (list|json|yaml)")
+		interactiveOnly := fs.Bool("interactive-only", true, "Only interactive elements")
+		includeHeadings := fs.Bool("include-headings", true, "Include headings")
+		maxItems := fs.Int("max-items", 80, "Max items")
+		maxChars := fs.Int("max-chars", 8000, "Max chars")
+		fs.Usage = func() { printCommandUsage("snapshot") }
 		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		return runWithPage(g, *pageName, "snapshot", map[string]interface{}{
@@ -149,10 +187,13 @@ func run(args []string) error {
 
 	case "click-ref":
 		fs := flag.NewFlagSet("click-ref", flag.ContinueOnError)
-		pageName := fs.String("page", "main", "")
-		timeout := fs.Int("timeout-ms", 15_000, "")
-		fs.SetOutput(io.Discard)
+		pageName := fs.String("page", "main", "Page name")
+		timeout := fs.Int("timeout-ms", 15_000, "Timeout ms")
+		fs.Usage = func() { printCommandUsage("click-ref") }
 		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		if fs.NArg() < 1 {
@@ -163,10 +204,13 @@ func run(args []string) error {
 
 	case "fill-ref":
 		fs := flag.NewFlagSet("fill-ref", flag.ContinueOnError)
-		pageName := fs.String("page", "main", "")
-		timeout := fs.Int("timeout-ms", 15_000, "")
-		fs.SetOutput(io.Discard)
+		pageName := fs.String("page", "main", "Page name")
+		timeout := fs.Int("timeout-ms", 15_000, "Timeout ms")
+		fs.Usage = func() { printCommandUsage("fill-ref") }
 		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		if fs.NArg() < 2 {
@@ -178,9 +222,12 @@ func run(args []string) error {
 
 	case "press":
 		fs := flag.NewFlagSet("press", flag.ContinueOnError)
-		pageName := fs.String("page", "main", "")
-		fs.SetOutput(io.Discard)
+		pageName := fs.String("page", "main", "Page name")
+		fs.Usage = func() { printCommandUsage("press") }
 		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		if fs.NArg() < 1 {
@@ -191,13 +238,16 @@ func run(args []string) error {
 
 	case "screenshot":
 		fs := flag.NewFlagSet("screenshot", flag.ContinueOnError)
-		pageName := fs.String("page", "main", "")
-		pathArg := fs.String("path", "", "")
-		fullPage := fs.Bool("full-page", true, "")
-		annotate := fs.Bool("annotate-refs", false, "")
-		crop := fs.String("crop", "", "")
-		fs.SetOutput(io.Discard)
+		pageName := fs.String("page", "main", "Page name")
+		pathArg := fs.String("path", "", "Output path")
+		fullPage := fs.Bool("full-page", true, "Full page")
+		annotate := fs.Bool("annotate-refs", false, "Annotate refs")
+		crop := fs.String("crop", "", "Crop x,y,w,h")
+		fs.Usage = func() { printCommandUsage("screenshot") }
 		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		payload := map[string]interface{}{"path": *pathArg, "full_page": *fullPage, "annotate_refs": *annotate}
@@ -208,20 +258,26 @@ func run(args []string) error {
 
 	case "save-html":
 		fs := flag.NewFlagSet("save-html", flag.ContinueOnError)
-		pageName := fs.String("page", "main", "")
-		pathArg := fs.String("path", "", "")
-		fs.SetOutput(io.Discard)
+		pageName := fs.String("page", "main", "Page name")
+		pathArg := fs.String("path", "", "Output path")
+		fs.Usage = func() { printCommandUsage("save-html") }
 		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		return runWithPage(g, *pageName, "save_html", map[string]interface{}{"path": *pathArg})
 
 	case "actions":
 		fs := flag.NewFlagSet("actions", flag.ContinueOnError)
-		callsArg := fs.String("calls", "", "")
-		pageName := fs.String("page", "main", "")
-		fs.SetOutput(io.Discard)
+		callsArg := fs.String("calls", "", "JSON calls array (or stdin)")
+		pageName := fs.String("page", "main", "Page name")
+		fs.Usage = func() { printCommandUsage("actions") }
 		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		raw := strings.TrimSpace(*callsArg)
@@ -264,21 +320,27 @@ func run(args []string) error {
 
 	case "wait":
 		fs := flag.NewFlagSet("wait", flag.ContinueOnError)
-		pageName := fs.String("page", "main", "")
-		strategy := fs.String("strategy", "playwright", "")
-		stateVal := fs.String("state", "load", "")
-		timeout := fs.Int("timeout-ms", 10_000, "")
-		minWait := fs.Int("min-wait-ms", 0, "")
-		fs.SetOutput(io.Discard)
+		pageName := fs.String("page", "main", "Page name")
+		strategy := fs.String("strategy", "playwright", "Strategy")
+		stateVal := fs.String("state", "load", "State")
+		timeout := fs.Int("timeout-ms", 10_000, "Timeout ms")
+		minWait := fs.Int("min-wait-ms", 0, "Min wait ms")
+		fs.Usage = func() { printCommandUsage("wait") }
 		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		return runWithPage(g, *pageName, "wait", map[string]interface{}{"strategy": *strategy, "state": *stateVal, "timeout_ms": *timeout, "min_wait_ms": *minWait})
 
 	case "close-page":
 		fs := flag.NewFlagSet("close-page", flag.ContinueOnError)
-		fs.SetOutput(io.Discard)
+		fs.Usage = func() { printCommandUsage("close-page") }
 		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
 			return err
 		}
 		if fs.NArg() < 1 {
@@ -308,6 +370,7 @@ func run(args []string) error {
 		return nil
 	}
 
+	printUsage()
 	return fmt.Errorf("unknown command: %s", cmd)
 }
 
@@ -344,14 +407,17 @@ func runDaemon(args []string) error {
 	stateFile := getenvDefault("DEV_BROWSER_STATE_FILE", "")
 
 	fs := flag.NewFlagSet("dev-browser-go-daemon", flag.ContinueOnError)
-	fs.StringVar(&profile, "profile", profile, "")
-	fs.StringVar(&host, "host", host, "")
-	fs.IntVar(&port, "port", port, "")
-	fs.IntVar(&cdpPort, "cdp-port", cdpPort, "")
-	fs.BoolVar(&headless, "headless", headless, "")
-	fs.StringVar(&stateFile, "state-file", stateFile, "")
-	fs.SetOutput(io.Discard)
+	fs.StringVar(&profile, "profile", profile, "Profile name")
+	fs.StringVar(&host, "host", host, "Listen host")
+	fs.IntVar(&port, "port", port, "Listen port")
+	fs.IntVar(&cdpPort, "cdp-port", cdpPort, "CDP port")
+	fs.BoolVar(&headless, "headless", headless, "Headless")
+	fs.StringVar(&stateFile, "state-file", stateFile, "State file")
+	fs.Usage = func() { printDaemonUsage() }
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return nil
+		}
 		return err
 	}
 
@@ -429,4 +495,83 @@ func getenvInt(name string, def int) int {
 func envTruthy(name string) bool {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
 	return v == "1" || v == "true" || v == "yes" || v == "on"
+}
+
+func printUsage() {
+	fmt.Fprintf(os.Stdout, `dev-browser-go %s - ref-based browser automation (CLI + daemon)
+
+Usage:
+  dev-browser-go [global flags] <command> [args]
+  dev-browser-go --daemon [daemon flags]
+
+Global flags:
+  --profile <name>           Browser profile (default env DEV_BROWSER_PROFILE or "default")
+  --headless                 Force headless
+  --output summary|json|path Output format (default: summary)
+  --out <path>               Output path when --output=path
+  --help, -h                 Show help
+  --version, -v              Show version
+
+Commands:
+  goto <url> [--page name] [--wait-until state] [--timeout-ms ms]
+  snapshot [--page name] [--engine simple|aria] [--format list|json|yaml] [--interactive-only] [--include-headings] [--max-items N] [--max-chars N]
+  click-ref <ref> [--page name] [--timeout-ms ms]
+  fill-ref <ref> <text> [--page name] [--timeout-ms ms]
+  press <key> [--page name]
+  screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h]
+  save-html [--page name] [--path PATH]
+  call <tool> [--args JSON] [--page name]
+  actions [--calls JSON] [--page name] (reads stdin if empty)
+  wait [--page name] [--strategy] [--state] [--timeout-ms] [--min-wait-ms]
+  list-pages
+  close-page <name>
+  status | start | stop
+
+Run "dev-browser-go <command> --help" for command details.
+`, version)
+}
+
+func printCommandUsage(cmd string) {
+	switch cmd {
+	case "goto":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] goto <url> [--page name] [--wait-until state] [--timeout-ms ms]\n")
+	case "snapshot":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] snapshot [--page name] [--engine simple|aria] [--format list|json|yaml] [--interactive-only] [--include-headings] [--max-items N] [--max-chars N]\n")
+	case "click-ref":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] click-ref <ref> [--page name] [--timeout-ms ms]\n")
+	case "fill-ref":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] fill-ref <ref> <text> [--page name] [--timeout-ms ms]\n")
+	case "press":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] press <key> [--page name]\n")
+	case "screenshot":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h]\n")
+	case "save-html":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] save-html [--page name] [--path PATH]\n")
+	case "call":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] call <tool> [--args JSON] [--page name]\n")
+	case "actions":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] actions [--calls JSON] [--page name] (reads stdin if --calls empty)\n")
+	case "wait":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] wait [--page name] [--strategy STR] [--state STATE] [--timeout-ms MS] [--min-wait-ms MS]\n")
+	case "list-pages":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] list-pages\n")
+	case "close-page":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] close-page <name>\n")
+	case "status":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] status\n")
+	case "start":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] start\n")
+	case "stop":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] stop\n")
+	default:
+		printUsage()
+	}
+}
+
+func printDaemonUsage() {
+	fmt.Fprintf(os.Stdout, `dev-browser-go --daemon - run daemon only
+
+Usage:
+  dev-browser-go --daemon [--profile name] [--host addr] [--port port] [--cdp-port port] [--headless] [--state-file path]
+`)
 }

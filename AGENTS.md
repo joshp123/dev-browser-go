@@ -12,3 +12,5 @@ Behavior: ref snapshots via injected JS (simple/aria engines). Crop clamp 2000x2
 Packaging: Go-only. Single binary `dev-browser-go` (daemon via `--daemon`). Flake outputs Go binary only.
 
 Testing: use nix develop (Playwright browsers present) then `HEADLESS=1 ./dev-browser-go goto https://example.com` and `./dev-browser-go snapshot`. Run `go test ./...`. Keep files <500 LOC.
+
+CLI: clig.dev compliant. `--help`, `--version`, subcommand help all work. See SKILL.md for usage workflows, README.md for install/reference.
