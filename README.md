@@ -44,14 +44,17 @@ The MCP server exists if you need it, but the CLI + daemon is the recommended pa
 
 Requires Python 3.11+ and Playwright browsers.
 
-```bash
-# Install playwright browsers (one-time)
-playwright install chromium
+### pip (local checkout)
 
-# Run CLI directly
-python cli.py goto https://example.com
-python cli.py snapshot
-python cli.py click-ref e3
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install .
+python -m playwright install chromium
+
+dev-browser goto https://example.com
+dev-browser snapshot
+dev-browser click-ref e3
 ```
 
 ### Nix (flake)

@@ -155,7 +155,9 @@ class Server(HTTPServer):
         self.profile = profile
 
 
-def main(argv: list[str]) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
     parser = argparse.ArgumentParser(prog="dev-browser-daemon", add_help=True)
     parser.add_argument("--profile", default=os.environ.get("DEV_BROWSER_PROFILE", "default"))
     parser.add_argument("--host", default="127.0.0.1")
@@ -210,4 +212,4 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(main())

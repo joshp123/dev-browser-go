@@ -5,13 +5,15 @@ import logging
 import os
 import signal
 import sys
-from typing import Any
+from typing import Any, Optional
 
 from dev_browser_mcp.browser import BrowserManager
 from dev_browser_mcp.stdio_server import serve_stdio
 
 
-def main(argv: list[str]) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
     parser = argparse.ArgumentParser(prog="dev-browser-mcp-server", add_help=True)
     parser.add_argument("--profile", default=os.environ.get("DEV_BROWSER_PROFILE", "default"))
     parser.add_argument(
@@ -40,5 +42,4 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
-
+    raise SystemExit(main())

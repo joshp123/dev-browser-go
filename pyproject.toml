@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dev-browser-mcp"
+version = "0.1.0"
+description = "Token-light browser automation via Playwright."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+dependencies = ["playwright>=1.40.0"]
+
+[project.scripts]
+dev-browser = "cli:main"
+dev-browser-daemon = "daemon:main"
+dev-browser-mcp-server = "server:main"
+
+[tool.setuptools]
+packages = ["dev_browser_mcp"]
+py-modules = ["cli", "daemon", "server"]
+
+[tool.setuptools.package-data]
+dev_browser_mcp = ["vendor/dev_browser_snapshot/*.js", "vendor/dev_browser_snapshot/*.txt"]

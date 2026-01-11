@@ -42,7 +42,9 @@ def parse_crop_arg(raw: str | None) -> Optional[dict[str, int]]:
     return {"x": x, "y": y, "width": min(w, max_wh), "height": min(h, max_wh)}
 
 
-def main(argv: list[str]) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
     # First pass: capture global flags no matter where they appear so
     # `dev-browser start --headless` works (argparse normally requires
     # globals before the subcommand).
@@ -293,4 +295,4 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(main())
