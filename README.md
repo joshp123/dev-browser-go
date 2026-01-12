@@ -89,6 +89,7 @@ The daemon starts automatically on first command and keeps the browser session a
 | `fill-ref <ref> "text"` | Fill input by ref |
 | `press <key>` | Keyboard input |
 | `screenshot` | Save screenshot (crops clamp to 2000x2000) |
+| `console` | Read page console logs (default levels: info,warning,error) |
 | `save-html` | Save page HTML |
 | `wait` | Wait for page state |
 | `list-pages` | Show open pages |
@@ -118,6 +119,36 @@ Workflow:
 ```
 
 For detailed workflow examples, see [SKILL.md](SKILL.md).
+
+## Integration with Codex
+
+Codex can use the CLI directly via its shell access. Example prompt:
+
+```
+Use dev-browser-go to navigate to example.com and find all links on the page.
+
+Available commands:
+- dev-browser-go goto <url>
+- dev-browser-go snapshot [--interactive-only / --no-interactive-only]
+- dev-browser-go click-ref <ref>
+- dev-browser-go fill-ref <ref> "text"
+- dev-browser-go screenshot
+- dev-browser-go press <key>
+- dev-browser-go console [--since <id>] [--limit <n>] [--levels <csv>]
+```
+
+## Tools
+
+- `goto <url>` - navigate
+- `snapshot` - accessibility tree with refs
+- `click-ref <ref>` - click element
+- `fill-ref <ref> "text"` - fill input
+- `press <key>` - keyboard input
+- `screenshot` - save screenshot
+- `console` - read page console logs (default levels: info,warning,error)
+- `save-html` - save page HTML
+- `list-pages` - show open pages
+- `status` / `start` / `stop` - daemon management
 
 ## Versioning & Releases
 
