@@ -8,8 +8,10 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -74,7 +76,7 @@ func ServeDaemon(opts DaemonOptions) error {
 	mux.HandleFunc("/health", d.handleHealth)
 	mux.HandleFunc("/", d.handleRoot)
 	mux.HandleFunc("/pages", d.handlePages)
-	mux.HandleFunc("/pages/", d.handleDeletePage)
+	mux.HandleFunc("/pages/", d.handlePageSubresource)
 	mux.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
 		d.writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 		go func() {
@@ -167,21 +169,82 @@ func (d *Daemon) handlePages(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (d *Daemon) handleDeletePage(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
-		d.writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not found"})
-		return
-	}
-	name := strings.TrimPrefix(r.URL.Path, "/pages/")
-	if name == "" {
+func (d *Daemon) handlePageSubresource(w http.ResponseWriter, r *http.Request) {
+	rest := strings.TrimPrefix(r.URL.Path, "/pages/")
+	if rest == "" {
 		d.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "name required"})
 		return
 	}
-	if closed := d.host.ClosePage(name); !closed {
-		d.writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "page not found"})
+	parts := strings.Split(rest, "/")
+	name, err := url.PathUnescape(parts[0])
+	if err != nil || strings.TrimSpace(name) == "" {
+		d.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid page name"})
 		return
 	}
-	d.writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+
+	if len(parts) == 1 {
+		if r.Method != http.MethodDelete {
+			d.writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not found"})
+			return
+		}
+		if closed := d.host.ClosePage(name); !closed {
+			d.writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "page not found"})
+			return
+		}
+		d.writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
+
+	if len(parts) != 2 || parts[1] != "console" {
+		d.writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not found"})
+		return
+	}
+	if r.Method != http.MethodGet {
+		d.writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not found"})
+		return
+	}
+
+	query := r.URL.Query()
+	since := int64(0)
+	if raw := strings.TrimSpace(query.Get("since")); raw != "" {
+		val, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || val < 0 {
+			d.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid since"})
+			return
+		}
+		since = val
+	}
+	limit := defaultConsoleLogMax
+	if raw := strings.TrimSpace(query.Get("limit")); raw != "" {
+		val, err := strconv.Atoi(raw)
+		if err != nil || val < 0 {
+			d.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid limit"})
+			return
+		}
+		limit = val
+	}
+
+	levelFilter, err := parseConsoleLevels(query.Get("levels"))
+	if err != nil {
+		d.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+
+	logs, lastID, err := d.host.ConsoleLogs(name, since, limit)
+	if err != nil {
+		d.writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	logs = filterConsoleEntries(logs, levelFilter)
+
+	d.writeJSON(w, http.StatusOK, map[string]any{
+		"ok":      true,
+		"page":    name,
+		"since":   since,
+		"limit":   limit,
+		"last_id": lastID,
+		"logs":    logs,
+	})
 }
 
 func (d *Daemon) writeJSON(w http.ResponseWriter, status int, payload map[string]any) {

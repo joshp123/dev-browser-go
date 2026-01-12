@@ -186,6 +186,58 @@ func run(args []string) error {
 			"max_chars":        *maxChars,
 		})
 
+	case "console":
+		fs := flag.NewFlagSet("console", flag.ContinueOnError)
+		pageName := fs.String("page", "main", "Page name")
+		since := fs.Int64("since", 0, "Only return entries with id > since")
+		limit := fs.Int("limit", 200, "Max entries")
+		levels := fs.String("levels", "info,warning,error", "CSV levels (debug,info,warning,error,all)")
+		fs.Usage = func() { printCommandUsage("console") }
+		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
+			return err
+		}
+		if *since < 0 {
+			return errors.New("--since must be >= 0")
+		}
+		if *limit < 0 {
+			return errors.New("--limit must be >= 0")
+		}
+		if err := devbrowser.StartDaemon(g.profile, g.headless); err != nil {
+			return err
+		}
+		base := devbrowser.DaemonBaseURL(g.profile)
+		if base == "" {
+			return errors.New("daemon state missing after start")
+		}
+		endpoint := fmt.Sprintf("%s/pages/%s/console", base, url.PathEscape(*pageName))
+		query := url.Values{}
+		query.Set("limit", strconv.Itoa(*limit))
+		if strings.TrimSpace(*levels) != "" {
+			query.Set("levels", *levels)
+		}
+		if *since > 0 {
+			query.Set("since", strconv.FormatInt(*since, 10))
+		}
+		if encoded := query.Encode(); encoded != "" {
+			endpoint += "?" + encoded
+		}
+		data, err := devbrowser.HTTPJSON("GET", endpoint, nil, 5*time.Second)
+		if err != nil {
+			return err
+		}
+		if ok, _ := data["ok"].(bool); !ok {
+			return fmt.Errorf("console failed: %v", data["error"])
+		}
+		out, err := devbrowser.WriteOutput(g.profile, g.output, data, g.outPath)
+		if err != nil {
+			return err
+		}
+		fmt.Println(out)
+		return nil
+
 	case "click-ref":
 		fs := flag.NewFlagSet("click-ref", flag.ContinueOnError)
 		pageName := fs.String("page", "main", "Page name")
@@ -637,6 +689,7 @@ Commands:
   press <key> [--page name]
   screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h] [--selector CSS] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--padding-px PX] [--timeout-ms MS]
   bounds [selector] [--page name] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--timeout-ms MS]
+  console [--page name] [--since id] [--limit N] [--levels csv]
   save-html [--page name] [--path PATH]
   call <tool> [--args JSON] [--page name]
   actions [--calls JSON] [--page name] (reads stdin if empty)
@@ -665,6 +718,8 @@ func printCommandUsage(cmd string) {
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h] [--selector CSS] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--padding-px PX] [--timeout-ms MS]\n")
 	case "bounds":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] bounds [selector] [--page name] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--timeout-ms MS]\n")
+	case "console":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] console [--page name] [--since id] [--limit N] [--levels csv]\n")
 	case "save-html":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] save-html [--page name] [--path PATH]\n")
 	case "call":
