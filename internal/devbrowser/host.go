@@ -239,7 +239,7 @@ func (b *BrowserHost) attachConsoleLocked(name string, page playwright.Page) {
 		// Page must be in registry before attaching console
 		return
 	}
-	if ok && holder.consoleHooked {
+	if holder.consoleHooked {
 		return
 	}
 	page.OnConsole(func(msg playwright.ConsoleMessage) {

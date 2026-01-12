@@ -173,6 +173,73 @@ func TestParseConsoleLevels_WithSpaces(t *testing.T) {
 	}
 }
 
+func TestFilterConsoleEntries_All(t *testing.T) {
+	entries := []ConsoleEntry{
+		{Type: "debug"},
+		{Type: "info"},
+		{Type: "warning"},
+		{Type: "error"},
+	}
+	filter, err := parseConsoleLevels("all")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := filterConsoleEntries(entries, filter)
+	if len(out) != len(entries) {
+		t.Fatalf("expected %d entries, got %d", len(entries), len(out))
+	}
+}
+
+func TestFilterConsoleEntries_SpecificLevels(t *testing.T) {
+	entries := []ConsoleEntry{
+		{Type: "debug"},
+		{Type: "log"},
+		{Type: "warning"},
+		{Type: "pageerror"},
+		{Type: "error"},
+	}
+	filter, err := parseConsoleLevels("info,error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := filterConsoleEntries(entries, filter)
+	if len(out) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(out))
+	}
+	if out[0].Type != "log" || out[1].Type != "pageerror" || out[2].Type != "error" {
+		t.Fatalf("unexpected filter order: %+v", out)
+	}
+}
+
+func TestFilterConsoleEntries_EmptyFilter(t *testing.T) {
+	entries := []ConsoleEntry{{Type: "info"}}
+	out := filterConsoleEntries(entries, consoleLevelFilter{allowed: map[string]bool{}})
+	if len(out) != 0 {
+		t.Fatalf("expected 0 entries with empty filter, got %d", len(out))
+	}
+}
+
+func TestConsoleLevelForType(t *testing.T) {
+	tests := []struct {
+		msgType string
+		want    string
+	}{
+		{"log", "info"},
+		{"pageerror", "error"},
+		{"warn", "warning"},
+		{"warning", "warning"},
+		{"ERROR", "error"},
+		{"unknown", "info"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.msgType, func(t *testing.T) {
+			if got := consoleLevelForType(tt.msgType); got != tt.want {
+				t.Fatalf("expected %q for %q, got %q", tt.want, tt.msgType, got)
+			}
+		})
+	}
+}
+
 // Tests for consoleStore.list (Fix #8)
 
 func TestConsoleStore_List_SinceZero(t *testing.T) {

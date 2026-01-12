@@ -239,12 +239,9 @@ func (d *Daemon) handlePageSubresource(w http.ResponseWriter, r *http.Request) {
 		d.writeJSON(w, status, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
-	logs = filterConsoleEntries(logs, levelFilter)
-	if limit > 0 && len(logs) > limit {
-		logs = logs[len(logs)-limit:]
-		if len(logs) > 0 {
-			lastID = logs[len(logs)-1].ID
-		}
+	logs = selectConsoleLogs(logs, levelFilter, since, limit)
+	if len(logs) > 0 {
+		lastID = logs[len(logs)-1].ID
 	}
 
 	d.writeJSON(w, http.StatusOK, map[string]any{
@@ -255,6 +252,17 @@ func (d *Daemon) handlePageSubresource(w http.ResponseWriter, r *http.Request) {
 		"last_id": lastID,
 		"logs":    logs,
 	})
+}
+
+func selectConsoleLogs(logs []ConsoleEntry, filter consoleLevelFilter, since int64, limit int) []ConsoleEntry {
+	entries := filterConsoleEntries(logs, filter)
+	if limit <= 0 || len(entries) <= limit {
+		return entries
+	}
+	if since > 0 {
+		return entries[:limit]
+	}
+	return entries[len(entries)-limit:]
 }
 
 func (d *Daemon) writeJSON(w http.ResponseWriter, status int, payload map[string]any) {
