@@ -205,7 +205,7 @@ func run(args []string) error {
 		if *limit < 0 {
 			return errors.New("--limit must be >= 0")
 		}
-		if err := devbrowser.StartDaemon(g.profile, g.headless); err != nil {
+		if err := devbrowser.StartDaemon(g.profile, g.headless, g.window); err != nil {
 			return err
 		}
 		base := devbrowser.DaemonBaseURL(g.profile)
