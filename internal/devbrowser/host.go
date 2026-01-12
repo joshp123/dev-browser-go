@@ -235,6 +235,10 @@ func (b *BrowserHost) startLocked() error {
 
 func (b *BrowserHost) attachConsoleLocked(name string, page playwright.Page) {
 	holder, ok := b.registry[name]
+	if !ok {
+		// Page must be in registry before attaching console
+		return
+	}
 	if ok && holder.consoleHooked {
 		return
 	}

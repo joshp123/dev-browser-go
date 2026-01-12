@@ -76,12 +76,7 @@ func (c *consoleStore) appendEntry(name string, entry ConsoleEntry) {
 	c.mu.Lock()
 	logs := c.logs[name]
 	if c.max > 0 && len(logs) >= c.max {
-		drop := len(logs) - c.max + 1
-		if drop < len(logs) {
-			logs = logs[drop:]
-		} else {
-			logs = nil
-		}
+		logs = logs[len(logs)-c.max+1:]
 	}
 	logs = append(logs, entry)
 	c.logs[name] = logs
@@ -133,7 +128,7 @@ func (c *consoleStore) clear(name string) {
 func (c *consoleStore) clearAll() {
 	c.mu.Lock()
 	c.logs = make(map[string][]ConsoleEntry)
-	c.nextID = 0
+	atomic.StoreInt64(&c.nextID, 0)
 	c.mu.Unlock()
 }
 
