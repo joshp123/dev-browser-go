@@ -229,12 +229,22 @@ func (d *Daemon) handlePageSubresource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logs, lastID, err := d.host.ConsoleLogs(name, since, limit)
+	logs, lastID, err := d.host.ConsoleLogs(name, since, 0)
 	if err != nil {
-		d.writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": err.Error()})
+		status := http.StatusBadRequest
+		if strings.Contains(err.Error(), "page not found") {
+			status = http.StatusNotFound
+		}
+		d.writeJSON(w, status, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
 	logs = filterConsoleEntries(logs, levelFilter)
+	if limit > 0 && len(logs) > limit {
+		logs = logs[len(logs)-limit:]
+		if len(logs) > 0 {
+			lastID = logs[len(logs)-1].ID
+		}
+	}
 
 	d.writeJSON(w, http.StatusOK, map[string]any{
 		"ok":      true,
