@@ -16,7 +16,7 @@ import (
 	devbrowser "github.com/joshp123/dev-browser-go/internal/devbrowser"
 )
 
-const version = "0.1.0"
+const version = "0.2.0"
 
 type globals struct {
 	profile  string
