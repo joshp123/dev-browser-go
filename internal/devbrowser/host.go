@@ -150,6 +150,10 @@ func (b *BrowserHost) startLocked() error {
 		return nil
 	}
 
+	if err := playwright.Install(&playwright.RunOptions{Browsers: []string{"chromium"}}); err != nil {
+		return fmt.Errorf("install playwright: %w", err)
+	}
+
 	if err := os.MkdirAll(b.userData, 0o755); err != nil {
 		return err
 	}
