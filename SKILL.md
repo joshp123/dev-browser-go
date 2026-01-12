@@ -73,8 +73,10 @@ dev-browser-go snapshot --interactive-only=false  # Include all elements
 dev-browser-go snapshot --engine aria        # Use ARIA engine (better for complex UIs)
 dev-browser-go screenshot                    # Full-page screenshot
 dev-browser-go screenshot --annotate-refs    # Overlay ref labels on screenshot
+dev-browser-go screenshot --selector ".panel" --padding-px 10  # Element crop + padding
 dev-browser-go screenshot --crop 0,0,800,600 # Crop region (max 2000x2000)
-dev-browser-go save-html                     # Save page HTML
+dev-browser-go bounds ".panel" --nth 1      # Element bounds (CSS or ARIA)
+dev-browser-go save-html --path page.html    # Save page HTML
 ```
 
 ### Interaction
@@ -135,22 +137,32 @@ dev-browser-go snapshot --page settings  # Back to settings
 ```
 
 ### Headless Mode
-For CI or background tasks:
+Default is headless. To disable:
 ```bash
-HEADLESS=1 dev-browser-go goto https://example.com
-```
-
-Or start explicitly:
-```bash
-dev-browser-go stop
-dev-browser-go start --headless
+dev-browser-go start --headed
+# or
+HEADLESS=0 dev-browser-go goto https://example.com
 ```
 
 ### Viewport Size
-Default is 2500x1920. Override with env:
+Default is ultrawide 7680x2160. Adjust with flags:
 ```bash
-DEV_BROWSER_WINDOW_SIZE=1920x1080 dev-browser-go goto https://example.com
+dev-browser-go goto https://example.com --window-scale 0.75  # 2880p ultrawide
+# or
+dev-browser-go goto https://example.com --window-size 3840x1080
 ```
+
+### Element Screenshots
+For component-level captures, use CSS selectors from your codebase:
+```bash
+dev-browser-go bounds ".vault-panel"                        # Verify selector + check dimensions
+dev-browser-go screenshot --selector ".vault-panel" --padding-px 8
+```
+
+Tips:
+- Use class selectors from your source code — you know your component names
+- Check `bounds` first to verify dimensions match expected area
+- Small padding (8-16px) for tight crops
 
 ### Debugging
 If something isn't working:

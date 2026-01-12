@@ -65,7 +65,10 @@ The daemon starts automatically on first command and keeps the browser session a
 
 ```
 --profile <name>    Browser profile (default: "default", env DEV_BROWSER_PROFILE)
---headless          Force headless mode (env HEADLESS=1)
+--headless          Run headless (default)
+--headed            Disable headless
+--window-size WxH   Viewport size (default 7680x2160 ultrawide)
+--window-scale S    Viewport scale preset (1, 0.75, 0.5)
 --output <format>   Output format: summary|json|path (default: summary)
 --out <path>        Write output to file (with --output=path)
 ```
@@ -75,8 +78,7 @@ The daemon starts automatically on first command and keeps the browser session a
 | Variable | Description |
 |----------|-------------|
 | `DEV_BROWSER_PROFILE` | Browser profile name |
-| `HEADLESS` | Run headless (1/true/yes) |
-| `DEV_BROWSER_WINDOW_SIZE` | Viewport WxH (default 2500x1920) |
+| `HEADLESS` | Override headless default (1/true/yes to enable, 0/false to disable) |
 | `DEV_BROWSER_ALLOW_UNSAFE_PATHS` | Allow artifact writes outside cache dir |
 
 ## Commands
@@ -88,7 +90,8 @@ The daemon starts automatically on first command and keeps the browser session a
 | `click-ref <ref>` | Click element by ref |
 | `fill-ref <ref> "text"` | Fill input by ref |
 | `press <key>` | Keyboard input |
-| `screenshot` | Save screenshot (crops clamp to 2000x2000) |
+| `screenshot` | Save screenshot (full-page or element crop with padding; crops clamp to 2000x2000) |
+| `bounds` | Get element bounding box (selector/ARIA) |
 | `save-html` | Save page HTML |
 | `wait` | Wait for page state |
 | `list-pages` | Show open pages |
@@ -115,6 +118,12 @@ Workflow:
 2. `dev-browser-go snapshot` - get interactive elements as refs (e1, e2, etc.)
 3. `dev-browser-go click-ref <ref>` or `dev-browser-go fill-ref <ref> "text"` - interact
 4. `dev-browser-go screenshot` - capture state if needed
+```
+
+Element-level capture:
+```bash
+dev-browser-go bounds ".vault-panel" --nth 1
+dev-browser-go screenshot --selector ".vault-panel" --padding-px 10
 ```
 
 For detailed workflow examples, see [SKILL.md](SKILL.md).

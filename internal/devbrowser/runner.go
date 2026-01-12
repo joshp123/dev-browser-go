@@ -191,12 +191,60 @@ func RunCall(page playwright.Page, name string, args map[string]interface{}, art
 			return nil, err
 		}
 
+		selector, err := optionalString(args, "selector", "")
+		if err != nil {
+			return nil, err
+		}
+		ariaRole, err := optionalString(args, "aria_role", "")
+		if err != nil {
+			return nil, err
+		}
+		ariaName, err := optionalString(args, "aria_name", "")
+		if err != nil {
+			return nil, err
+		}
+		nth, err := optionalInt(args, "nth", 1)
+		if err != nil {
+			return nil, err
+		}
+		padding, err := optionalInt(args, "padding_px", 10)
+		if err != nil {
+			return nil, err
+		}
+		targetTimeout, err := optionalInt(args, "timeout_ms", 5_000)
+		if err != nil {
+			return nil, err
+		}
+
+		hasTarget := strings.TrimSpace(selector) != "" || strings.TrimSpace(ariaRole) != "" || strings.TrimSpace(ariaName) != ""
+		if crop != nil && hasTarget {
+			return nil, errors.New("--crop cannot be combined with selector/aria targeting")
+		}
+
 		path, err := SafeArtifactPath(artifactDir, pathArg, fmt.Sprintf("screenshot-%d.png", NowMS()))
 		if err != nil {
 			return nil, err
 		}
 
 		opts := playwright.PageScreenshotOptions{Path: playwright.String(path), FullPage: playwright.Bool(fullPage)}
+		var clip *playwright.Rect
+		var spec TargetSpec
+
+		if hasTarget {
+			spec = TargetSpec{Selector: selector, AriaRole: ariaRole, AriaName: ariaName, Nth: nth, Timeout: targetTimeout}
+			box, err := resolveBounds(page, spec)
+			if err != nil {
+				return nil, err
+			}
+			vp := viewportSize(page)
+			clip, err = clipWithPadding(box, padding, vp)
+			if err != nil {
+				return nil, err
+			}
+			opts.Clip = clip
+			opts.FullPage = playwright.Bool(false)
+		}
+
 		if crop != nil {
 			opts.Clip = crop
 			opts.FullPage = playwright.Bool(false)
@@ -213,7 +261,16 @@ func RunCall(page playwright.Page, name string, args map[string]interface{}, art
 		if shotErr != nil {
 			return nil, shotErr
 		}
-		return RunResult{"path": path}, nil
+
+		res := RunResult{"path": path}
+		if clip != nil {
+			res["selector"] = selector
+			res["aria_role"] = ariaRole
+			res["aria_name"] = ariaName
+			res["nth"] = spec.effectiveNth()
+			res["clip"] = map[string]float64{"x": clip.X, "y": clip.Y, "width": clip.Width, "height": clip.Height}
+		}
+		return res, nil
 
 	case "save_html":
 		pathArg, err := optionalString(args, "path", "")
@@ -232,6 +289,44 @@ func RunCall(page playwright.Page, name string, args map[string]interface{}, art
 			return nil, err
 		}
 		return RunResult{"path": path}, nil
+
+	case "bounds":
+		selector, err := optionalString(args, "selector", "")
+		if err != nil {
+			return nil, err
+		}
+		ariaRole, err := optionalString(args, "aria_role", "")
+		if err != nil {
+			return nil, err
+		}
+		ariaName, err := optionalString(args, "aria_name", "")
+		if err != nil {
+			return nil, err
+		}
+		nth, err := optionalInt(args, "nth", 1)
+		if err != nil {
+			return nil, err
+		}
+		timeoutMs, err := optionalInt(args, "timeout_ms", 5_000)
+		if err != nil {
+			return nil, err
+		}
+
+		spec := TargetSpec{Selector: selector, AriaRole: ariaRole, AriaName: ariaName, Nth: nth, Timeout: timeoutMs}
+		box, err := resolveBounds(page, spec)
+		if err != nil {
+			return nil, err
+		}
+		return RunResult{
+			"selector":  selector,
+			"aria_role": ariaRole,
+			"aria_name": ariaName,
+			"nth":       spec.effectiveNth(),
+			"x":         box.X,
+			"y":         box.Y,
+			"width":     box.Width,
+			"height":    box.Height,
+		}, nil
 	}
 
 	return nil, fmt.Errorf("unknown call '%s'", name)

@@ -95,7 +95,7 @@ func IsDaemonHealthy(profile string) bool {
 	return ok
 }
 
-func StartDaemon(profile string, headless bool) error {
+func StartDaemon(profile string, headless bool, window *WindowSize) error {
 	if IsDaemonHealthy(profile) {
 		return nil
 	}
@@ -114,6 +114,9 @@ func StartDaemon(profile string, headless bool) error {
 	args := []string{"--daemon", "--profile", profile}
 	if headless {
 		args = append(args, "--headless")
+	}
+	if window != nil {
+		args = append(args, "--window-size", fmt.Sprintf("%dx%d", window.Width, window.Height))
 	}
 
 	cmd := exec.Command(exe, args...)
@@ -165,8 +168,8 @@ func StopDaemon(profile string) (bool, error) {
 	return true, nil
 }
 
-func EnsurePage(profile string, headless bool, page string) (string, string, error) {
-	if err := StartDaemon(profile, headless); err != nil {
+func EnsurePage(profile string, headless bool, page string, window *WindowSize) (string, string, error) {
+	if err := StartDaemon(profile, headless, window); err != nil {
 		return "", "", err
 	}
 	base := DaemonBaseURL(profile)

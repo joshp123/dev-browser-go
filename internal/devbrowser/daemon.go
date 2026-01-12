@@ -20,6 +20,7 @@ type DaemonOptions struct {
 	Port      int
 	CDPPort   int
 	Headless  bool
+	Window    *WindowSize
 	StateFile string
 	Logger    *log.Logger
 }
@@ -49,7 +50,7 @@ func ServeDaemon(opts DaemonOptions) error {
 		cdpPort = p
 	}
 
-	host := NewBrowserHost(profile, opts.Headless, cdpPort)
+	host := NewBrowserHost(profile, opts.Headless, cdpPort, opts.Window)
 	if err := host.Start(); err != nil {
 		return err
 	}

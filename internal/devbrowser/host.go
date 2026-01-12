@@ -23,6 +23,7 @@ type BrowserHost struct {
 	profile  string
 	headless bool
 	cdpPort  int
+	window   *WindowSize
 
 	mu       sync.Mutex
 	pw       *playwright.Playwright
@@ -37,12 +38,17 @@ type pageHolder struct {
 	targetID string
 }
 
-func NewBrowserHost(profile string, headless bool, cdpPort int) *BrowserHost {
+func NewBrowserHost(profile string, headless bool, cdpPort int, window *WindowSize) *BrowserHost {
 	stateBase := filepath.Join(PlatformStateDir(), cacheSubdir, profile)
+	if window == nil {
+		defaultSize := DefaultWindowSize()
+		window = &defaultSize
+	}
 	return &BrowserHost{
 		profile:  profile,
 		headless: headless,
 		cdpPort:  cdpPort,
+		window:   window,
 		registry: make(map[string]pageHolder),
 		userData: filepath.Join(stateBase, "chromium-profile"),
 	}
@@ -153,12 +159,7 @@ func (b *BrowserHost) startLocked() error {
 		return fmt.Errorf("start playwright: %w", err)
 	}
 
-	window, err := WindowSizeFromEnv()
-	if err != nil {
-		pw.Stop()
-		return err
-	}
-
+	window := b.window
 	opts := playwright.BrowserTypeLaunchPersistentContextOptions{
 		AcceptDownloads:   playwright.Bool(true),
 		Headless:          playwright.Bool(b.headless),

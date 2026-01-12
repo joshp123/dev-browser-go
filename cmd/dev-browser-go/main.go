@@ -23,6 +23,7 @@ type globals struct {
 	headless bool
 	output   string
 	outPath  string
+	window   *devbrowser.WindowSize
 }
 
 func main() {
@@ -84,7 +85,7 @@ func run(args []string) error {
 		return nil
 
 	case "start":
-		if err := devbrowser.StartDaemon(g.profile, g.headless); err != nil {
+		if err := devbrowser.StartDaemon(g.profile, g.headless, g.window); err != nil {
 			return err
 		}
 		fmt.Printf("started profile=%s url=%s\n", g.profile, devbrowser.DaemonBaseURL(g.profile))
@@ -103,7 +104,7 @@ func run(args []string) error {
 		return nil
 
 	case "list-pages":
-		if err := devbrowser.StartDaemon(g.profile, g.headless); err != nil {
+		if err := devbrowser.StartDaemon(g.profile, g.headless, g.window); err != nil {
 			return err
 		}
 		base := devbrowser.DaemonBaseURL(g.profile)
@@ -243,6 +244,12 @@ func run(args []string) error {
 		fullPage := fs.Bool("full-page", true, "Full page")
 		annotate := fs.Bool("annotate-refs", false, "Annotate refs")
 		crop := fs.String("crop", "", "Crop x,y,w,h")
+		selector := fs.String("selector", "", "CSS selector for element crop")
+		ariaRole := fs.String("aria-role", "", "ARIA role for element crop")
+		ariaName := fs.String("aria-name", "", "ARIA name for element crop")
+		nth := fs.Int("nth", 1, "Nth match (1-based)")
+		padding := fs.Int("padding-px", 10, "Padding around element in px")
+		timeout := fs.Int("timeout-ms", 5_000, "Timeout ms for element wait")
 		fs.Usage = func() { printCommandUsage("screenshot") }
 		if err := fs.Parse(rest); err != nil {
 			if err == flag.ErrHelp {
@@ -250,11 +257,56 @@ func run(args []string) error {
 			}
 			return err
 		}
-		payload := map[string]interface{}{"path": *pathArg, "full_page": *fullPage, "annotate_refs": *annotate}
+		payload := map[string]interface{}{"full_page": *fullPage, "annotate_refs": *annotate, "nth": *nth, "padding_px": *padding, "timeout_ms": *timeout}
+		if strings.TrimSpace(*pathArg) != "" {
+			payload["path"] = *pathArg
+		}
 		if strings.TrimSpace(*crop) != "" {
 			payload["crop"] = *crop
 		}
+		if strings.TrimSpace(*selector) != "" {
+			payload["selector"] = *selector
+		}
+		if strings.TrimSpace(*ariaRole) != "" {
+			payload["aria_role"] = *ariaRole
+		}
+		if strings.TrimSpace(*ariaName) != "" {
+			payload["aria_name"] = *ariaName
+		}
 		return runWithPage(g, *pageName, "screenshot", payload)
+
+	case "bounds":
+		fs := flag.NewFlagSet("bounds", flag.ContinueOnError)
+		pageName := fs.String("page", "main", "Page name")
+		selector := fs.String("selector", "", "CSS selector")
+		ariaRole := fs.String("aria-role", "", "ARIA role")
+		ariaName := fs.String("aria-name", "", "ARIA name")
+		nth := fs.Int("nth", 1, "Nth match (1-based)")
+		timeout := fs.Int("timeout-ms", 5_000, "Timeout ms")
+		fs.Usage = func() { printCommandUsage("bounds") }
+		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
+			return err
+		}
+		if fs.NArg() > 0 && strings.TrimSpace(*selector) == "" {
+			*selector = fs.Arg(0)
+		}
+		if strings.TrimSpace(*selector) == "" && strings.TrimSpace(*ariaRole) == "" {
+			return errors.New("selector or --aria-role required")
+		}
+		payload := map[string]interface{}{"nth": *nth, "timeout_ms": *timeout}
+		if strings.TrimSpace(*selector) != "" {
+			payload["selector"] = *selector
+		}
+		if strings.TrimSpace(*ariaRole) != "" {
+			payload["aria_role"] = *ariaRole
+		}
+		if strings.TrimSpace(*ariaName) != "" {
+			payload["aria_name"] = *ariaName
+		}
+		return runWithPage(g, *pageName, "bounds", payload)
 
 	case "save-html":
 		fs := flag.NewFlagSet("save-html", flag.ContinueOnError)
@@ -292,7 +344,7 @@ func run(args []string) error {
 		if err := json.Unmarshal([]byte(raw), &calls); err != nil {
 			return errors.New("invalid JSON for --calls/stdin")
 		}
-		ws, tid, err := devbrowser.EnsurePage(g.profile, g.headless, *pageName)
+		ws, tid, err := devbrowser.EnsurePage(g.profile, g.headless, *pageName, g.window)
 		if err != nil {
 			return err
 		}
@@ -347,7 +399,7 @@ func run(args []string) error {
 			return errors.New("page name required")
 		}
 		name := fs.Arg(0)
-		if err := devbrowser.StartDaemon(g.profile, g.headless); err != nil {
+		if err := devbrowser.StartDaemon(g.profile, g.headless, g.window); err != nil {
 			return err
 		}
 		base := devbrowser.DaemonBaseURL(g.profile)
@@ -375,7 +427,7 @@ func run(args []string) error {
 }
 
 func runWithPage(g globals, pageName string, tool string, args map[string]interface{}) error {
-	ws, tid, err := devbrowser.EnsurePage(g.profile, g.headless, pageName)
+	ws, tid, err := devbrowser.EnsurePage(g.profile, g.headless, pageName, g.window)
 	if err != nil {
 		return err
 	}
@@ -403,8 +455,14 @@ func runDaemon(args []string) error {
 	host := getenvDefault("DEV_BROWSER_HOST", "127.0.0.1")
 	port := getenvInt("DEV_BROWSER_PORT", 0)
 	cdpPort := getenvInt("DEV_BROWSER_CDP_PORT", 0)
-	headless := envTruthy("HEADLESS")
+	headless := true
+	if raw := strings.TrimSpace(os.Getenv("HEADLESS")); raw != "" {
+		headless = envTruthy("HEADLESS")
+	}
 	stateFile := getenvDefault("DEV_BROWSER_STATE_FILE", "")
+	windowSizeRaw := ""
+	windowScale := 1.0
+	windowScaleSet := false
 
 	fs := flag.NewFlagSet("dev-browser-go-daemon", flag.ContinueOnError)
 	fs.StringVar(&profile, "profile", profile, "Profile name")
@@ -413,6 +471,8 @@ func runDaemon(args []string) error {
 	fs.IntVar(&cdpPort, "cdp-port", cdpPort, "CDP port")
 	fs.BoolVar(&headless, "headless", headless, "Headless")
 	fs.StringVar(&stateFile, "state-file", stateFile, "State file")
+	fs.StringVar(&windowSizeRaw, "window-size", windowSizeRaw, "Viewport WxH")
+	fs.Float64Var(&windowScale, "window-scale", windowScale, "Viewport scale (e.g. 1, 0.75, 0.5)")
 	fs.Usage = func() { printDaemonUsage() }
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -421,20 +481,43 @@ func runDaemon(args []string) error {
 		return err
 	}
 
+	if fs.Lookup("window-scale").Value.String() != "1" {
+		windowScaleSet = true
+	}
+	if windowSizeRaw != "" && windowScaleSet {
+		return fmt.Errorf("use either --window-size or --window-scale")
+	}
+
+	scaleVal := windowScale
+	if !windowScaleSet {
+		scaleVal = 1
+	}
+	window, err := devbrowser.ResolveWindowSize(windowSizeRaw, scaleVal)
+	if err != nil {
+		return err
+	}
+
 	logger := log.New(os.Stderr, "", log.LstdFlags)
-	return devbrowser.ServeDaemon(devbrowser.DaemonOptions{Profile: profile, Host: host, Port: port, CDPPort: cdpPort, Headless: headless, StateFile: stateFile, Logger: logger})
+	return devbrowser.ServeDaemon(devbrowser.DaemonOptions{Profile: profile, Host: host, Port: port, CDPPort: cdpPort, Headless: headless, Window: window, StateFile: stateFile, Logger: logger})
 }
 
 func parseGlobals(args []string) (globals, []string, error) {
 	g := globals{
 		profile:  getenvDefault("DEV_BROWSER_PROFILE", "default"),
-		headless: envTruthy("HEADLESS"),
+		headless: true,
 		output:   "summary",
 		outPath:  "",
 	}
 
+	if raw := strings.TrimSpace(os.Getenv("HEADLESS")); raw != "" {
+		g.headless = envTruthy("HEADLESS")
+	}
+
 	remaining := []string{}
 	i := 0
+	windowSizeRaw := ""
+	windowScale := 1.0
+	windowScaleSet := false
 	for i < len(args) {
 		a := args[i]
 		switch a {
@@ -446,6 +529,9 @@ func parseGlobals(args []string) (globals, []string, error) {
 			i += 2
 		case "--headless":
 			g.headless = true
+			i++
+		case "--headed":
+			g.headless = false
 			i++
 		case "--output":
 			if i+1 >= len(args) {
@@ -459,6 +545,24 @@ func parseGlobals(args []string) (globals, []string, error) {
 			}
 			g.outPath = args[i+1]
 			i += 2
+		case "--window-size":
+			if i+1 >= len(args) {
+				return g, nil, errors.New("--window-size requires value")
+			}
+			windowSizeRaw = args[i+1]
+			i += 2
+		case "--window-scale":
+			if i+1 >= len(args) {
+				return g, nil, errors.New("--window-scale requires value")
+			}
+			scaleStr := args[i+1]
+			val, err := strconv.ParseFloat(scaleStr, 64)
+			if err != nil {
+				return g, nil, fmt.Errorf("--window-scale must be a number (e.g. 1, 0.75, 0.5)")
+			}
+			windowScale = val
+			windowScaleSet = true
+			i += 2
 		default:
 			remaining = args[i:]
 			i = len(args)
@@ -468,6 +572,16 @@ func parseGlobals(args []string) (globals, []string, error) {
 	if g.output != "summary" && g.output != "json" && g.output != "path" {
 		return g, nil, errors.New("--output must be summary|json|path")
 	}
+
+	scaleVal := windowScale
+	if !windowScaleSet {
+		scaleVal = 1
+	}
+	window, err := devbrowser.ResolveWindowSize(windowSizeRaw, scaleVal)
+	if err != nil {
+		return g, nil, err
+	}
+	g.window = window
 
 	return g, remaining, nil
 }
@@ -507,6 +621,9 @@ Usage:
 Global flags:
   --profile <name>           Browser profile (default env DEV_BROWSER_PROFILE or "default")
   --headless                 Force headless
+  --headed                   Disable headless
+  --window-size WxH          Viewport size (default 7680x2160 ultrawide)
+  --window-scale SCALE       Viewport scale (1, 0.75, 0.5)
   --output summary|json|path Output format (default: summary)
   --out <path>               Output path when --output=path
   --help, -h                 Show help
@@ -518,7 +635,8 @@ Commands:
   click-ref <ref> [--page name] [--timeout-ms ms]
   fill-ref <ref> <text> [--page name] [--timeout-ms ms]
   press <key> [--page name]
-  screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h]
+  screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h] [--selector CSS] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--padding-px PX] [--timeout-ms MS]
+  bounds [selector] [--page name] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--timeout-ms MS]
   save-html [--page name] [--path PATH]
   call <tool> [--args JSON] [--page name]
   actions [--calls JSON] [--page name] (reads stdin if empty)
@@ -544,7 +662,9 @@ func printCommandUsage(cmd string) {
 	case "press":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] press <key> [--page name]\n")
 	case "screenshot":
-		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h]\n")
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h] [--selector CSS] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--padding-px PX] [--timeout-ms MS]\n")
+	case "bounds":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] bounds [selector] [--page name] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--timeout-ms MS]\n")
 	case "save-html":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] save-html [--page name] [--path PATH]\n")
 	case "call":
@@ -572,6 +692,6 @@ func printDaemonUsage() {
 	fmt.Fprintf(os.Stdout, `dev-browser-go --daemon - run daemon only
 
 Usage:
-  dev-browser-go --daemon [--profile name] [--host addr] [--port port] [--cdp-port port] [--headless] [--state-file path]
+  dev-browser-go --daemon [--profile name] [--host addr] [--port port] [--cdp-port port] [--headless] [--state-file path] [--window-size WxH] [--window-scale SCALE]
 `)
 }
