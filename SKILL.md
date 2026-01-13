@@ -77,6 +77,9 @@ dev-browser-go screenshot --selector ".panel" --padding-px 10  # Element crop + 
 dev-browser-go screenshot --crop 0,0,800,600 # Crop region (max 2000x2000)
 dev-browser-go bounds ".panel" --nth 1      # Element bounds (CSS or ARIA)
 dev-browser-go save-html --path page.html    # Save page HTML
+dev-browser-go console                       # Read console logs (defaults info,warning,error)
+dev-browser-go console --level error --level warning
+dev-browser-go console --since 10 --limit 50
 ```
 
 ### Interaction
