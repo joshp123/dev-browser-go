@@ -14,3 +14,5 @@ Packaging: Go-only. Single binary `dev-browser-go` (daemon via `--daemon`). Flak
 Testing: use nix develop (Playwright browsers present) then `HEADLESS=1 ./dev-browser-go goto https://example.com` and `./dev-browser-go snapshot`. Run `go test ./...`. Keep files <500 LOC.
 
 CLI: clig.dev compliant. `--help`, `--version`, subcommand help all work. See SKILL.md for usage workflows, README.md for install/reference.
+Console: use `console --level` (repeatable). No `--levels` compat. Default limit only when set.
+No backwards compat; pre-1.0 greenfield; breaking changes anytime; no legacy hacks.
