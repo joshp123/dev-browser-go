@@ -14,6 +14,8 @@ import (
 	"github.com/playwright-community/playwright-go"
 )
 
+var ErrPageNotFound = errors.New("page not found")
+
 type PageEntry struct {
 	Name     string
 	TargetID string
@@ -31,11 +33,13 @@ type BrowserHost struct {
 	ws       string
 	registry map[string]pageHolder
 	userData string
+	logs     *consoleStore
 }
 
 type pageHolder struct {
-	page     playwright.Page
-	targetID string
+	page          playwright.Page
+	targetID      string
+	consoleHooked bool
 }
 
 func NewBrowserHost(profile string, headless bool, cdpPort int, window *WindowSize) *BrowserHost {
@@ -51,6 +55,7 @@ func NewBrowserHost(profile string, headless bool, cdpPort int, window *WindowSi
 		window:   window,
 		registry: make(map[string]pageHolder),
 		userData: filepath.Join(stateBase, "chromium-profile"),
+		logs:     newConsoleStore(0),
 	}
 }
 
@@ -90,6 +95,9 @@ func (b *BrowserHost) Stop() {
 	}
 	b.pw = nil
 	b.ws = ""
+	if b.logs != nil {
+		b.logs.clearAll()
+	}
 }
 
 func (b *BrowserHost) ListPages() []string {
@@ -115,6 +123,9 @@ func (b *BrowserHost) ClosePage(name string) bool {
 		_ = holder.page.Close()
 	}
 	delete(b.registry, name)
+	if b.logs != nil {
+		b.logs.clear(name)
+	}
 	return true
 }
 
@@ -129,6 +140,9 @@ func (b *BrowserHost) GetOrCreatePage(name string) (PageEntry, error) {
 	}
 
 	if holder, ok := b.registry[name]; ok && holder.page != nil && !holder.page.IsClosed() {
+		if !holder.consoleHooked {
+			b.attachConsoleLocked(name, holder.page)
+		}
 		return PageEntry{Name: name, TargetID: holder.targetID}, nil
 	}
 
@@ -142,6 +156,7 @@ func (b *BrowserHost) GetOrCreatePage(name string) (PageEntry, error) {
 		return PageEntry{}, err
 	}
 	b.registry[name] = pageHolder{page: page, targetID: tid}
+	b.attachConsoleLocked(name, page)
 	return PageEntry{Name: name, TargetID: tid}, nil
 }
 
@@ -212,11 +227,57 @@ func (b *BrowserHost) startLocked() error {
 	b.context = context
 	b.ws = ws
 	b.registry["main"] = pageHolder{page: mainPage, targetID: tid}
+	b.attachConsoleLocked("main", mainPage)
 
 	for _, pg := range pages[1:] {
 		_ = pg.Close()
 	}
 	return nil
+}
+
+func (b *BrowserHost) attachConsoleLocked(name string, page playwright.Page) {
+	holder, ok := b.registry[name]
+	if !ok {
+		// Page must be in registry before attaching console
+		return
+	}
+	if holder.consoleHooked {
+		return
+	}
+	page.OnConsole(func(msg playwright.ConsoleMessage) {
+		if b.logs != nil {
+			b.logs.append(name, msg)
+		}
+	})
+	page.OnPageError(func(err error) {
+		if b.logs != nil {
+			b.logs.appendPageError(name, err)
+		}
+	})
+	holder.page = page
+	holder.consoleHooked = true
+	b.registry[name] = holder
+}
+
+func (b *BrowserHost) ConsoleLogs(name string, since int64, limit int) ([]ConsoleEntry, int64, error) {
+	if since < 0 {
+		return nil, 0, errors.New("since must be >= 0")
+	}
+	if limit < 0 {
+		return nil, 0, errors.New("limit must be >= 0")
+	}
+	b.mu.Lock()
+	holder, ok := b.registry[name]
+	pageOk := ok && holder.page != nil && !holder.page.IsClosed()
+	b.mu.Unlock()
+	if !pageOk {
+		return nil, 0, ErrPageNotFound
+	}
+	if b.logs == nil {
+		return nil, 0, nil
+	}
+	entries, lastID := b.logs.list(name, since, limit)
+	return entries, lastID, nil
 }
 
 func resolveTargetID(context playwright.BrowserContext, page playwright.Page) (string, error) {

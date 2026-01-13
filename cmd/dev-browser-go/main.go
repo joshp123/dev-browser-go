@@ -26,6 +26,21 @@ type globals struct {
 	window   *devbrowser.WindowSize
 }
 
+type levelList []string
+
+func (l *levelList) String() string {
+	return strings.Join(*l, ",")
+}
+
+func (l *levelList) Set(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	*l = append(*l, value)
+	return nil
+}
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -185,6 +200,81 @@ func run(args []string) error {
 			"max_items":        *maxItems,
 			"max_chars":        *maxChars,
 		})
+
+	case "console":
+		fs := flag.NewFlagSet("console", flag.ContinueOnError)
+		pageName := fs.String("page", "main", "Page name")
+		since := fs.Int64("since", 0, "Only return entries with id > since")
+		limit := fs.Int("limit", devbrowser.ConsoleDefaultLimit, fmt.Sprintf("Max entries (default %d)", devbrowser.ConsoleDefaultLimit))
+		var levelArgs levelList
+		fs.Var(&levelArgs, "level", "Log level (repeatable). Default info,warning,error")
+		fs.Usage = func() { printCommandUsage("console") }
+		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return nil
+			}
+			return err
+		}
+
+		if len(levelArgs) == 0 {
+			levelArgs = strings.Split(devbrowser.ConsoleDefaultLevels, ",")
+		}
+
+		var limitSet bool
+		fs.Visit(func(f *flag.Flag) {
+			switch f.Name {
+			case "limit":
+				limitSet = true
+			}
+		})
+
+		if *since < 0 {
+			return errors.New("--since must be >= 0")
+		}
+		if *limit < 0 {
+			return errors.New("--limit must be >= 0")
+		}
+		if err := devbrowser.StartDaemon(g.profile, g.headless, g.window); err != nil {
+			return err
+		}
+		base := devbrowser.DaemonBaseURL(g.profile)
+		if base == "" {
+			return errors.New("daemon state missing after start")
+		}
+		endpoint := fmt.Sprintf("%s/pages/%s/console", base, url.PathEscape(*pageName))
+		query := url.Values{}
+		if limitSet {
+			query.Set("limit", strconv.Itoa(*limit))
+		}
+		rawLevels := strings.Join(levelArgs, ",")
+		query.Set("levels", rawLevels)
+		if *since > 0 {
+			query.Set("since", strconv.FormatInt(*since, 10))
+		}
+		if encoded := query.Encode(); encoded != "" {
+			endpoint += "?" + encoded
+		}
+		data, err := devbrowser.HTTPJSON("GET", endpoint, nil, 5*time.Second)
+		if err != nil {
+			return err
+		}
+		if ok, _ := data["ok"].(bool); !ok {
+			return fmt.Errorf("console failed: %v", data["error"])
+		}
+		if g.output == "summary" {
+			resp, err := decodeConsoleResponse(data)
+			if err != nil {
+				return err
+			}
+			fmt.Println(formatConsoleSummary(resp))
+			return nil
+		}
+		out, err := devbrowser.WriteOutput(g.profile, g.output, data, g.outPath)
+		if err != nil {
+			return err
+		}
+		fmt.Println(out)
+		return nil
 
 	case "click-ref":
 		fs := flag.NewFlagSet("click-ref", flag.ContinueOnError)
@@ -611,6 +701,50 @@ func envTruthy(name string) bool {
 	return v == "1" || v == "true" || v == "yes" || v == "on"
 }
 
+type consoleResponse struct {
+	Page   string                    `json:"page"`
+	Since  int64                     `json:"since"`
+	Limit  int                       `json:"limit"`
+	LastID int64                     `json:"last_id"`
+	Logs   []devbrowser.ConsoleEntry `json:"logs"`
+}
+
+func decodeConsoleResponse(data map[string]any) (consoleResponse, error) {
+	var resp consoleResponse
+	b, err := json.Marshal(data)
+	if err != nil {
+		return resp, err
+	}
+	if err := json.Unmarshal(b, &resp); err != nil {
+		return resp, err
+	}
+	return resp, nil
+}
+
+func formatConsoleSummary(resp consoleResponse) string {
+	if len(resp.Logs) == 0 {
+		if strings.TrimSpace(resp.Page) != "" {
+			return fmt.Sprintf("%s: no console logs (last_id=%d)", resp.Page, resp.LastID)
+		}
+		return "no console logs"
+	}
+
+	var b strings.Builder
+	for _, entry := range resp.Logs {
+		fmt.Fprintf(&b, "#%d [%s] %s", entry.ID, strings.ToLower(entry.Type), entry.Text)
+		if entry.URL != "" {
+			if entry.Line > 0 {
+				fmt.Fprintf(&b, " (%s:%d:%d)", entry.URL, entry.Line, entry.Column)
+			} else {
+				fmt.Fprintf(&b, " (%s)", entry.URL)
+			}
+		}
+		b.WriteByte('\n')
+	}
+	fmt.Fprintf(&b, "page=%s since=%d limit=%d last_id=%d count=%d", resp.Page, resp.Since, resp.Limit, resp.LastID, len(resp.Logs))
+	return strings.TrimRight(b.String(), "\n")
+}
+
 func printUsage() {
 	fmt.Fprintf(os.Stdout, `dev-browser-go %s - ref-based browser automation (CLI + daemon)
 
@@ -637,6 +771,7 @@ Commands:
   press <key> [--page name]
   screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h] [--selector CSS] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--padding-px PX] [--timeout-ms MS]
   bounds [selector] [--page name] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--timeout-ms MS]
+  console [--page name] [--since id] [--limit N] [--level LEVEL]
   save-html [--page name] [--path PATH]
   call <tool> [--args JSON] [--page name]
   actions [--calls JSON] [--page name] (reads stdin if empty)
@@ -665,6 +800,8 @@ func printCommandUsage(cmd string) {
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h] [--selector CSS] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--padding-px PX] [--timeout-ms MS]\n")
 	case "bounds":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] bounds [selector] [--page name] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--timeout-ms MS]\n")
+	case "console":
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] console [--page name] [--since id] [--limit N] [--level LEVEL]\n")
 	case "save-html":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] save-html [--page name] [--path PATH]\n")
 	case "call":
