@@ -138,7 +138,7 @@ Use dev-browser-go to navigate to example.com and find all links on the page.
 
 Available commands:
 - dev-browser-go goto <url>
-- dev-browser-go snapshot [--interactive-only / --no-interactive-only]
+- dev-browser-go snapshot [--interactive-only=false]
 - dev-browser-go click-ref <ref>
 - dev-browser-go fill-ref <ref> "text"
 - dev-browser-go screenshot
@@ -154,9 +154,14 @@ Available commands:
 - `fill-ref <ref> "text"` - fill input
 - `press <key>` - keyboard input
 - `screenshot` - save screenshot
+- `bounds` - get element bounds (selector/ARIA)
 - `console` - read page console logs (default levels: info,warning,error)
 - `save-html` - save page HTML
+- `wait` - wait for page state
 - `list-pages` - show open pages
+- `close-page <name>` - close named page
+- `call <tool>` - generic tool call with JSON args
+- `actions` - batch tool calls from JSON
 - `status` / `start` / `stop` - daemon management
 
 ## Versioning & Releases
