@@ -71,6 +71,7 @@ The daemon starts automatically on first command and keeps the browser session a
 --headed            Disable headless
 --window-size WxH   Viewport size (default 7680x2160 ultrawide)
 --window-scale S    Viewport scale preset (1, 0.75, 0.5)
+--device <name>     Device profile name (Playwright)
 --output <format>   Output format: summary|json|path (default: summary)
 --out <path>        Write output to file (with --output=path)
 ```
@@ -81,7 +82,28 @@ The daemon starts automatically on first command and keeps the browser session a
 |----------|-------------|
 | `DEV_BROWSER_PROFILE` | Browser profile name |
 | `HEADLESS` | Override headless default (1/true/yes to enable, 0/false to disable) |
+| `DEV_BROWSER_WINDOW_SIZE` | Default viewport size (WxH) |
 | `DEV_BROWSER_ALLOW_UNSAFE_PATHS` | Allow artifact writes outside cache dir |
+
+### Viewport + Device Emulation
+
+Viewport only (responsive CSS):
+```bash
+dev-browser-go --window-size 412x915 goto https://example.com
+```
+
+Device profile (UA + DPR + touch + viewport/screen):
+```bash
+dev-browser-go --device "Galaxy S20 Ultra" goto https://example.com
+```
+Do not combine `--device` with `--window-size` or `--window-scale`.
+
+List available profiles:
+```bash
+dev-browser-go devices
+```
+
+Note: device profiles use Playwright names; device/viewport flags apply when the daemon starts. Stop the daemon to switch.
 
 ## Commands
 
@@ -96,6 +118,7 @@ The daemon starts automatically on first command and keeps the browser session a
 | `bounds` | Get element bounding box (selector/ARIA) |
 | `console` | Read page console logs (default levels: info,warning,error) |
 | `save-html` | Save page HTML |
+| `devices` | List device profile names |
 | `wait` | Wait for page state |
 | `list-pages` | Show open pages |
 | `close-page <name>` | Close named page |

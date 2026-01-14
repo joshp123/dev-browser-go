@@ -95,9 +95,12 @@ func IsDaemonHealthy(profile string) bool {
 	return ok
 }
 
-func StartDaemon(profile string, headless bool, window *WindowSize) error {
+func StartDaemon(profile string, headless bool, window *WindowSize, device string) error {
 	if IsDaemonHealthy(profile) {
 		return nil
+	}
+	if window != nil && strings.TrimSpace(device) != "" {
+		return errors.New("use either --window-size/--window-scale or --device")
 	}
 
 	dir := StateDir(profile)
@@ -117,6 +120,9 @@ func StartDaemon(profile string, headless bool, window *WindowSize) error {
 	}
 	if window != nil {
 		args = append(args, "--window-size", fmt.Sprintf("%dx%d", window.Width, window.Height))
+	}
+	if strings.TrimSpace(device) != "" {
+		args = append(args, "--device", device)
 	}
 
 	cmd := exec.Command(exe, args...)
@@ -168,8 +174,8 @@ func StopDaemon(profile string) (bool, error) {
 	return true, nil
 }
 
-func EnsurePage(profile string, headless bool, page string, window *WindowSize) (string, string, error) {
-	if err := StartDaemon(profile, headless, window); err != nil {
+func EnsurePage(profile string, headless bool, page string, window *WindowSize, device string) (string, string, error) {
+	if err := StartDaemon(profile, headless, window, device); err != nil {
 		return "", "", err
 	}
 	base := DaemonBaseURL(profile)
