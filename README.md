@@ -143,7 +143,7 @@ Available commands:
 - dev-browser-go fill-ref <ref> "text"
 - dev-browser-go screenshot
 - dev-browser-go press <key>
-- dev-browser-go console [--since <id>] [--limit <n>] [--levels <csv>]
+- dev-browser-go console [--since <id>] [--limit <n>] [--level <lvl> ...]
 ```
 
 ## Tools
@@ -155,7 +155,7 @@ Available commands:
 - `press <key>` - keyboard input
 - `screenshot` - save screenshot
 - `bounds` - get element bounds (selector/ARIA)
-- `console` - read page console logs (default levels: info,warning,error)
+- `console` - read page console logs (default levels: info,warning,error; repeatable `--level`)
 - `save-html` - save page HTML
 - `wait` - wait for page state
 - `list-pages` - show open pages

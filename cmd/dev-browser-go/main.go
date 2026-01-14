@@ -26,6 +26,51 @@ type globals struct {
 	window   *devbrowser.WindowSize
 }
 
+type repeatableStringFlag struct {
+	values []string
+}
+
+func (flagValue *repeatableStringFlag) String() string {
+	if flagValue == nil {
+		return ""
+	}
+	return strings.Join(flagValue.values, ",")
+}
+
+func (flagValue *repeatableStringFlag) Set(value string) error {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return errors.New("level must be non-empty")
+	}
+	flagValue.values = append(flagValue.values, trimmed)
+	return nil
+}
+
+type optionalIntFlag struct {
+	value int
+	set   bool
+}
+
+func (flagValue *optionalIntFlag) String() string {
+	if flagValue == nil || !flagValue.set {
+		return ""
+	}
+	return strconv.Itoa(flagValue.value)
+}
+
+func (flagValue *optionalIntFlag) Set(value string) error {
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return err
+	}
+	if parsed < 0 {
+		return errors.New("limit must be >= 0")
+	}
+	flagValue.value = parsed
+	flagValue.set = true
+	return nil
+}
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -190,8 +235,10 @@ func run(args []string) error {
 		fs := flag.NewFlagSet("console", flag.ContinueOnError)
 		pageName := fs.String("page", "main", "Page name")
 		since := fs.Int64("since", 0, "Only return entries with id > since")
-		limit := fs.Int("limit", 200, "Max entries")
-		levels := fs.String("levels", "info,warning,error", "CSV levels (debug,info,warning,error,all)")
+		limit := optionalIntFlag{}
+		levels := repeatableStringFlag{}
+		fs.Var(&limit, "limit", "Max entries")
+		fs.Var(&levels, "level", "Log level (repeatable: debug,info,warning,error,all)")
 		fs.Usage = func() { printCommandUsage("console") }
 		if err := fs.Parse(rest); err != nil {
 			if err == flag.ErrHelp {
@@ -202,9 +249,6 @@ func run(args []string) error {
 		if *since < 0 {
 			return errors.New("--since must be >= 0")
 		}
-		if *limit < 0 {
-			return errors.New("--limit must be >= 0")
-		}
 		if err := devbrowser.StartDaemon(g.profile, g.headless, g.window); err != nil {
 			return err
 		}
@@ -214,9 +258,11 @@ func run(args []string) error {
 		}
 		endpoint := fmt.Sprintf("%s/pages/%s/console", base, url.PathEscape(*pageName))
 		query := url.Values{}
-		query.Set("limit", strconv.Itoa(*limit))
-		if strings.TrimSpace(*levels) != "" {
-			query.Set("levels", *levels)
+		if limit.set {
+			query.Set("limit", strconv.Itoa(limit.value))
+		}
+		if len(levels.values) > 0 {
+			query.Set("levels", strings.Join(levels.values, ","))
 		}
 		if *since > 0 {
 			query.Set("since", strconv.FormatInt(*since, 10))
@@ -689,7 +735,7 @@ Commands:
   press <key> [--page name]
   screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h] [--selector CSS] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--padding-px PX] [--timeout-ms MS]
   bounds [selector] [--page name] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--timeout-ms MS]
-  console [--page name] [--since id] [--limit N] [--levels csv]
+  console [--page name] [--since id] [--limit N] [--level lvl]
   save-html [--page name] [--path PATH]
   call <tool> [--args JSON] [--page name]
   actions [--calls JSON] [--page name] (reads stdin if empty)
@@ -719,7 +765,7 @@ func printCommandUsage(cmd string) {
 	case "bounds":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] bounds [selector] [--page name] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--timeout-ms MS]\n")
 	case "console":
-		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] console [--page name] [--since id] [--limit N] [--levels csv]\n")
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] console [--page name] [--since id] [--limit N] [--level lvl]\n")
 	case "save-html":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] save-html [--page name] [--path PATH]\n")
 	case "call":
