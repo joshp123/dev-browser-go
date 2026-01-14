@@ -147,7 +147,7 @@ HEADLESS=0 dev-browser-go goto https://example.com
 ### Viewport Size
 Default is ultrawide 7680x2160. Adjust with flags:
 ```bash
-dev-browser-go goto https://example.com --window-scale 0.75  # 2880p ultrawide
+dev-browser-go goto https://example.com --window-scale 0.75  # 5760x1620 (0.75x default)
 # or
 dev-browser-go goto https://example.com --window-size 3840x1080
 ```
