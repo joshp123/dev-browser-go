@@ -8,6 +8,8 @@ Uses ref-based interaction: get a compact accessibility snapshot, then click/fil
 
 Inspired by [SawyerHood/dev-browser](https://github.com/SawyerHood/dev-browser). ARIA snapshot extraction is vendored from that project. Thanks to Sawyer Hood for the original work and ref-based model.
 
+Thanks to Daniel van Dorp (@djvdorp) for early contributions (pip packaging, console logs) and legacy MCP cleanup work.
+
 ## Comparison
 
 | Feature | SawyerHood/dev-browser | dev-browser-go |
