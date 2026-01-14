@@ -71,14 +71,20 @@ func (flagValue *optionalIntFlag) Set(value string) error {
 	return nil
 }
 
-var snapshotNoFlags = map[string]struct{}{
+var snapshotBoolFlags = map[string]struct{}{
 	"interactive-only": {},
 	"include-headings": {},
 }
 
-var screenshotNoFlags = map[string]struct{}{
+var snapshotNoFlags = snapshotBoolFlags
+
+var screenshotBoolFlags = map[string]struct{}{
 	"full-page": {},
 	"annotate-refs": {},
+}
+
+var screenshotNoFlags = map[string]struct{}{
+	"full-page": {},
 }
 
 func normalizeNoBoolFlags(args []string, allowed map[string]struct{}) []string {
@@ -100,6 +106,25 @@ func normalizeNoBoolFlags(args []string, allowed map[string]struct{}) []string {
 		out = append(out, arg)
 	}
 	return out
+}
+
+func rejectBoolEqualsFlags(args []string, names map[string]struct{}) error {
+	if len(args) == 0 || len(names) == 0 {
+		return nil
+	}
+	for _, arg := range args {
+		if !strings.HasPrefix(arg, "--") || strings.HasPrefix(arg, "--no-") {
+			continue
+		}
+		name := strings.TrimPrefix(arg, "--")
+		if eq := strings.Index(name, "="); eq != -1 {
+			flagName := name[:eq]
+			if _, ok := names[flagName]; ok {
+				return fmt.Errorf("use --%s or --no-%s (omit =true/false)", flagName, flagName)
+			}
+		}
+	}
+	return nil
 }
 
 func main() {
@@ -247,6 +272,9 @@ func run(args []string) error {
 		maxItems := fs.Int("max-items", 80, "Max items")
 		maxChars := fs.Int("max-chars", 8000, "Max chars")
 		fs.Usage = func() { printCommandUsage("snapshot") }
+		if err := rejectBoolEqualsFlags(rest, snapshotBoolFlags); err != nil {
+			return err
+		}
 		rest = normalizeNoBoolFlags(rest, snapshotNoFlags)
 		if err := fs.Parse(rest); err != nil {
 			if err == flag.ErrHelp {
@@ -381,6 +409,9 @@ func run(args []string) error {
 		padding := fs.Int("padding-px", 10, "Padding around element in px")
 		timeout := fs.Int("timeout-ms", 5_000, "Timeout ms for element wait")
 		fs.Usage = func() { printCommandUsage("screenshot") }
+		if err := rejectBoolEqualsFlags(rest, screenshotBoolFlags); err != nil {
+			return err
+		}
 		rest = normalizeNoBoolFlags(rest, screenshotNoFlags)
 		if err := fs.Parse(rest); err != nil {
 			if err == flag.ErrHelp {
