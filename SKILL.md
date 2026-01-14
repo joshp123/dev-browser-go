@@ -151,6 +151,19 @@ dev-browser-go goto https://example.com --window-scale 0.75  # 5760x1620 (0.75x 
 # or
 dev-browser-go goto https://example.com --window-size 3840x1080
 ```
+Env default:
+```bash
+DEV_BROWSER_WINDOW_SIZE=412x915 dev-browser-go goto https://example.com
+```
+
+### Device Emulation
+Use Playwright device profiles for UA + DPR + touch + viewport/screen:
+```bash
+dev-browser-go devices
+dev-browser-go --device "Galaxy S20 Ultra" goto https://example.com
+```
+Do not combine `--device` with `--window-size` or `--window-scale`.
+Note: device/viewport flags apply when the daemon starts. Stop the daemon to switch.
 
 ### Element Screenshots
 For component-level captures, use CSS selectors from your codebase:

@@ -24,6 +24,7 @@ type BrowserHost struct {
 	headless bool
 	cdpPort  int
 	window   *WindowSize
+	device   string
 
 	mu       sync.Mutex
 	pw       *playwright.Playwright
@@ -40,9 +41,10 @@ type pageHolder struct {
 	consoleHooked bool
 }
 
-func NewBrowserHost(profile string, headless bool, cdpPort int, window *WindowSize) *BrowserHost {
+func NewBrowserHost(profile string, headless bool, cdpPort int, window *WindowSize, device string) *BrowserHost {
 	stateBase := filepath.Join(PlatformStateDir(), cacheSubdir, profile)
-	if window == nil {
+	deviceName := strings.TrimSpace(device)
+	if window == nil && deviceName == "" {
 		defaultSize := DefaultWindowSize()
 		window = &defaultSize
 	}
@@ -51,6 +53,7 @@ func NewBrowserHost(profile string, headless bool, cdpPort int, window *WindowSi
 		headless: headless,
 		cdpPort:  cdpPort,
 		window:   window,
+		device:   deviceName,
 		registry: make(map[string]pageHolder),
 		userData: filepath.Join(stateBase, "chromium-profile"),
 		logs:     newConsoleStore(0),
@@ -176,14 +179,29 @@ func (b *BrowserHost) startLocked() error {
 		return fmt.Errorf("start playwright: %w", err)
 	}
 
+	device, err := resolveDeviceDescriptor(pw, b.device)
+	if err != nil {
+		pw.Stop()
+		return err
+	}
+
 	window := b.window
+	if device != nil {
+		if deviceWindow := deviceWindowSize(device); deviceWindow != nil {
+			window = deviceWindow
+		} else {
+			window = nil
+		}
+	}
 	opts := playwright.BrowserTypeLaunchPersistentContextOptions{
 		AcceptDownloads:   playwright.Bool(true),
 		Headless:          playwright.Bool(b.headless),
 		IgnoreHttpsErrors: playwright.Bool(true),
 		Args:              ChromiumLaunchArgs(b.cdpPort, window),
 	}
-	if window != nil {
+	if device != nil {
+		applyDeviceDescriptor(&opts, device)
+	} else if window != nil {
 		opts.Viewport = &playwright.Size{Width: window.Width, Height: window.Height}
 		opts.Screen = &playwright.Size{Width: window.Width, Height: window.Height}
 	}
