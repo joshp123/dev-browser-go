@@ -1,3 +1,0 @@
-Vendored from SawyerHood/dev-browser
-Path: skills/dev-browser/src/snapshot/browser-script.ts
-Commit: 45c3e37c9bdd3e806c9fc3b1d0d99108bd2161d7
