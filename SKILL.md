@@ -69,7 +69,7 @@ dev-browser-go close-page <name>             # Close named page
 ### Inspection
 ```bash
 dev-browser-go snapshot                      # Get refs for interactive elements
-dev-browser-go snapshot --interactive-only=false  # Include all elements
+dev-browser-go snapshot --no-interactive-only  # Include all elements
 dev-browser-go snapshot --engine aria        # Use ARIA engine (better for complex UIs)
 dev-browser-go screenshot                    # Full-page screenshot
 dev-browser-go screenshot --annotate-refs    # Overlay ref labels on screenshot
@@ -168,7 +168,7 @@ Tips:
 If something isn't working:
 ```bash
 dev-browser-go screenshot                    # See current state
-dev-browser-go snapshot --interactive-only=false  # See all elements
+dev-browser-go snapshot --no-interactive-only  # See all elements
 ```
 
 ## See Also

@@ -138,7 +138,7 @@ Use dev-browser-go to navigate to example.com and find all links on the page.
 
 Available commands:
 - dev-browser-go goto <url>
-- dev-browser-go snapshot [--interactive-only=false]
+- dev-browser-go snapshot [--no-interactive-only] [--no-include-headings]
 - dev-browser-go click-ref <ref>
 - dev-browser-go fill-ref <ref> "text"
 - dev-browser-go screenshot

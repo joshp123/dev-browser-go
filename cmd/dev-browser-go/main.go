@@ -71,6 +71,37 @@ func (flagValue *optionalIntFlag) Set(value string) error {
 	return nil
 }
 
+var snapshotNoFlags = map[string]struct{}{
+	"interactive-only": {},
+	"include-headings": {},
+}
+
+var screenshotNoFlags = map[string]struct{}{
+	"full-page": {},
+	"annotate-refs": {},
+}
+
+func normalizeNoBoolFlags(args []string, allowed map[string]struct{}) []string {
+	if len(args) == 0 || len(allowed) == 0 {
+		return args
+	}
+	out := make([]string, 0, len(args))
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--no-") {
+			name := strings.TrimPrefix(arg, "--no-")
+			if eq := strings.Index(name, "="); eq != -1 {
+				name = name[:eq]
+			}
+			if _, ok := allowed[name]; ok {
+				out = append(out, "--"+name+"=false")
+				continue
+			}
+		}
+		out = append(out, arg)
+	}
+	return out
+}
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -216,6 +247,7 @@ func run(args []string) error {
 		maxItems := fs.Int("max-items", 80, "Max items")
 		maxChars := fs.Int("max-chars", 8000, "Max chars")
 		fs.Usage = func() { printCommandUsage("snapshot") }
+		rest = normalizeNoBoolFlags(rest, snapshotNoFlags)
 		if err := fs.Parse(rest); err != nil {
 			if err == flag.ErrHelp {
 				return nil
@@ -349,6 +381,7 @@ func run(args []string) error {
 		padding := fs.Int("padding-px", 10, "Padding around element in px")
 		timeout := fs.Int("timeout-ms", 5_000, "Timeout ms for element wait")
 		fs.Usage = func() { printCommandUsage("screenshot") }
+		rest = normalizeNoBoolFlags(rest, screenshotNoFlags)
 		if err := fs.Parse(rest); err != nil {
 			if err == flag.ErrHelp {
 				return nil
@@ -729,11 +762,11 @@ Global flags:
 
 Commands:
   goto <url> [--page name] [--wait-until state] [--timeout-ms ms]
-  snapshot [--page name] [--engine simple|aria] [--format list|json|yaml] [--interactive-only] [--include-headings] [--max-items N] [--max-chars N]
+  snapshot [--page name] [--engine simple|aria] [--format list|json|yaml] [--no-interactive-only] [--no-include-headings] [--max-items N] [--max-chars N]
   click-ref <ref> [--page name] [--timeout-ms ms]
   fill-ref <ref> <text> [--page name] [--timeout-ms ms]
   press <key> [--page name]
-  screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h] [--selector CSS] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--padding-px PX] [--timeout-ms MS]
+  screenshot [--page name] [--path PATH] [--no-full-page] [--annotate-refs] [--crop x,y,w,h] [--selector CSS] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--padding-px PX] [--timeout-ms MS]
   bounds [selector] [--page name] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--timeout-ms MS]
   console [--page name] [--since id] [--limit N] [--level lvl]
   save-html [--page name] [--path PATH]
@@ -753,7 +786,7 @@ func printCommandUsage(cmd string) {
 	case "goto":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] goto <url> [--page name] [--wait-until state] [--timeout-ms ms]\n")
 	case "snapshot":
-		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] snapshot [--page name] [--engine simple|aria] [--format list|json|yaml] [--interactive-only] [--include-headings] [--max-items N] [--max-chars N]\n")
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] snapshot [--page name] [--engine simple|aria] [--format list|json|yaml] [--no-interactive-only] [--no-include-headings] [--max-items N] [--max-chars N]\n")
 	case "click-ref":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] click-ref <ref> [--page name] [--timeout-ms ms]\n")
 	case "fill-ref":
@@ -761,7 +794,7 @@ func printCommandUsage(cmd string) {
 	case "press":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] press <key> [--page name]\n")
 	case "screenshot":
-		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] screenshot [--page name] [--path PATH] [--full-page] [--annotate-refs] [--crop x,y,w,h] [--selector CSS] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--padding-px PX] [--timeout-ms MS]\n")
+		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] screenshot [--page name] [--path PATH] [--no-full-page] [--annotate-refs] [--crop x,y,w,h] [--selector CSS] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--padding-px PX] [--timeout-ms MS]\n")
 	case "bounds":
 		fmt.Fprintf(os.Stdout, "Usage: dev-browser-go [globals] bounds [selector] [--page name] [--aria-role ROLE] [--aria-name NAME] [--nth N] [--timeout-ms MS]\n")
 	case "console":
